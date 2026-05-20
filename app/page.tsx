@@ -12,6 +12,7 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [jiraFilter, setJiraFilter] = useState<'all' | 'in-jira' | 'not-in-jira'>('all');
   const [search, setSearch] = useState('');
 
   const fetchNotes = useCallback(async () => {
@@ -29,11 +30,19 @@ export default function Home() {
 
   const filtered = notes.filter((n) => {
     const matchesCategory = activeCategory === 'All' || n.category === activeCategory;
+    const matchesJira =
+      jiraFilter === 'all' ||
+      (jiraFilter === 'in-jira' && n.isJiraTicket) ||
+      (jiraFilter === 'not-in-jira' && !n.isJiraTicket);
     const q = search.toLowerCase();
     const matchesSearch =
       !q || n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q);
-    return matchesCategory && matchesSearch;
+    return matchesCategory && matchesJira && matchesSearch;
   });
+
+  const notInJira = filtered.filter((n) => !n.isJiraTicket);
+  const inJira = filtered.filter((n) => n.isJiraTicket);
+  const showGrouped = jiraFilter === 'all' && notInJira.length > 0 && inJira.length > 0;
 
   const handleCreate = async (payload: CreateNotePayload) => {
     const res = await fetch('/api/notes', {
@@ -126,14 +135,40 @@ export default function Home() {
 
       {/* Main */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Category Filter */}
-        {categories.length > 0 && (
-          <div className="mb-6">
-            <CategoryFilter
-              categories={categories}
-              active={activeCategory}
-              onChange={(cat) => setActiveCategory(cat)}
-            />
+        {/* Filters row */}
+        {(categories.length > 0 || notes.length > 0) && (
+          <div className="mb-6 flex flex-wrap items-center gap-4">
+            {categories.length > 0 && (
+              <CategoryFilter
+                categories={categories}
+                active={activeCategory}
+                onChange={(cat) => setActiveCategory(cat)}
+              />
+            )}
+            {notes.length > 0 && (
+              <div className="flex items-center gap-1 ml-auto bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0">
+                {(['all', 'not-in-jira', 'in-jira'] as const).map((val) => {
+                  const labels = { all: 'All', 'not-in-jira': 'Needs Ticket', 'in-jira': 'In Jira' };
+                  return (
+                    <button
+                      key={val}
+                      onClick={() => setJiraFilter(val)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        jiraFilter === val
+                          ? val === 'in-jira'
+                            ? 'bg-blue-500 text-white shadow-sm'
+                            : val === 'not-in-jira'
+                            ? 'bg-amber-400 text-white shadow-sm'
+                            : 'bg-indigo-500 text-white shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {labels[val]}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -149,14 +184,16 @@ export default function Home() {
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="text-6xl mb-4">📝</div>
             <h2 className="text-xl font-semibold text-gray-500 mb-2">
-              {search || activeCategory !== 'All' ? 'No notes match your filter' : 'No notes yet'}
+              {search || activeCategory !== 'All' || jiraFilter !== 'all'
+                ? 'No notes match your filter'
+                : 'No notes yet'}
             </h2>
             <p className="text-gray-400 text-sm mb-6">
-              {search || activeCategory !== 'All'
-                ? 'Try a different search or category.'
+              {search || activeCategory !== 'All' || jiraFilter !== 'all'
+                ? 'Try adjusting your search or filters.'
                 : 'Create your first sticky note to get started.'}
             </p>
-            {!search && activeCategory === 'All' && (
+            {!search && activeCategory === 'All' && jiraFilter === 'all' && (
               <button
                 onClick={() => setShowForm(true)}
                 className="px-5 py-2.5 bg-indigo-500 text-white text-sm font-medium rounded-xl hover:bg-indigo-600 transition-colors shadow-md shadow-indigo-200"
@@ -167,19 +204,36 @@ export default function Home() {
           </div>
         )}
 
-        {/* Notes Grid */}
+        {/* Notes — grouped or flat */}
         {!loading && filtered.length > 0 && (
-          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
-            {filtered.map((note) => (
-              <div key={note.id} className="break-inside-avoid">
-                <NoteCard
-                  note={note}
+          <div className="space-y-10">
+            {showGrouped ? (
+              <>
+                <NoteSection
+                  title="Needs Jira Ticket"
+                  indicator="amber"
+                  notes={notInJira}
                   onEdit={openEdit}
                   onDelete={handleDelete}
                   onToggleJira={handleToggleJira}
                 />
-              </div>
-            ))}
+                <NoteSection
+                  title="In Jira"
+                  indicator="blue"
+                  notes={inJira}
+                  onEdit={openEdit}
+                  onDelete={handleDelete}
+                  onToggleJira={handleToggleJira}
+                />
+              </>
+            ) : (
+              <NoteSection
+                notes={filtered}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                onToggleJira={handleToggleJira}
+              />
+            )}
           </div>
         )}
 
@@ -188,6 +242,8 @@ export default function Home() {
           <p className="mt-8 text-center text-xs text-gray-400">
             {filtered.length} {filtered.length === 1 ? 'note' : 'notes'}
             {activeCategory !== 'All' && ` in "${activeCategory}"`}
+            {jiraFilter === 'in-jira' && ' · In Jira'}
+            {jiraFilter === 'not-in-jira' && ' · Needs Ticket'}
             {search && ` matching "${search}"`}
           </p>
         )}
@@ -202,6 +258,48 @@ export default function Home() {
           onClose={closeForm}
         />
       )}
+    </div>
+  );
+}
+
+interface NoteSectionProps {
+  title?: string;
+  indicator?: 'amber' | 'blue';
+  notes: Note[];
+  onEdit: (note: Note) => void;
+  onDelete: (id: string) => void;
+  onToggleJira: (note: Note) => void;
+}
+
+function NoteSection({ title, indicator, notes, onEdit, onDelete, onToggleJira }: NoteSectionProps) {
+  return (
+    <div>
+      {title && (
+        <div className="flex items-center gap-3 mb-4">
+          <span
+            className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${
+              indicator === 'blue' ? 'bg-blue-500' : 'bg-amber-400'
+            }`}
+          />
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{title}</h2>
+          <span className="text-xs text-gray-400 font-normal normal-case tracking-normal">
+            ({notes.length})
+          </span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+      )}
+      <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
+        {notes.map((note) => (
+          <div key={note.id} className="break-inside-avoid">
+            <NoteCard
+              note={note}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onToggleJira={onToggleJira}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
