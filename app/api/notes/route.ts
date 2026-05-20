@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
     category: body.category.trim() || 'General',
     color: body.color,
     isJiraTicket: false,
+    isHandled: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

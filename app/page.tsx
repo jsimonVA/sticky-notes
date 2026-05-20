@@ -11,6 +11,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [view, setView] = useState<'active' | 'handled'>('active');
   const [activeCategory, setActiveCategory] = useState('All');
   const [jiraFilter, setJiraFilter] = useState<'all' | 'in-jira' | 'not-in-jira'>('all');
   const [search, setSearch] = useState('');
@@ -26,9 +27,14 @@ export default function Home() {
     fetchNotes();
   }, [fetchNotes]);
 
-  const categories = Array.from(new Set(notes.map((n) => n.category))).sort();
+  const handledCount = notes.filter((n) => n.isHandled).length;
+  const categories = Array.from(
+    new Set(notes.filter((n) => !n.isHandled).map((n) => n.category))
+  ).sort();
 
   const filtered = notes.filter((n) => {
+    if (view === 'active' && n.isHandled) return false;
+    if (view === 'handled' && !n.isHandled) return false;
     const matchesCategory = activeCategory === 'All' || n.category === activeCategory;
     const matchesJira =
       jiraFilter === 'all' ||
@@ -42,7 +48,7 @@ export default function Home() {
 
   const notInJira = filtered.filter((n) => !n.isJiraTicket);
   const inJira = filtered.filter((n) => n.isJiraTicket);
-  const showGrouped = jiraFilter === 'all' && notInJira.length > 0 && inJira.length > 0;
+  const showGrouped = view === 'active' && jiraFilter === 'all' && notInJira.length > 0 && inJira.length > 0;
 
   const handleCreate = async (payload: CreateNotePayload) => {
     const res = await fetch('/api/notes', {
@@ -82,6 +88,16 @@ export default function Home() {
     setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
   };
 
+  const handleToggleHandled = async (note: Note) => {
+    const res = await fetch(`/api/notes/${note.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isHandled: !note.isHandled }),
+    });
+    const updated: Note = await res.json();
+    setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+  };
+
   const openEdit = (note: Note) => {
     setEditingNote(note);
     setShowForm(false);
@@ -92,14 +108,47 @@ export default function Home() {
     setEditingNote(null);
   };
 
+  const isFiltered = search || activeCategory !== 'All' || jiraFilter !== 'all';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-indigo-50 to-purple-50">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
-          <div className="flex items-center gap-2 mr-2">
+          <div className="flex items-center gap-2 mr-2 shrink-0">
             <span className="text-2xl">🗒️</span>
             <h1 className="text-xl font-bold text-gray-800 tracking-tight">Sticky Notes</h1>
+          </div>
+
+          {/* View switcher */}
+          <div className="flex items-center gap-0.5 bg-gray-100 rounded-xl p-1 shrink-0">
+            <button
+              onClick={() => setView('active')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                view === 'active'
+                  ? 'bg-white text-gray-800 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => setView('handled')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                view === 'handled'
+                  ? 'bg-white text-gray-800 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Handled
+              {handledCount > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                  view === 'handled' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'
+                }`}>
+                  {handledCount}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Search */}
@@ -119,24 +168,27 @@ export default function Home() {
             />
           </div>
 
-          <div className="ml-auto">
-            <button
-              onClick={() => { setShowForm(true); setEditingNote(null); }}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-xl hover:bg-indigo-600 shadow-md shadow-indigo-200 transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              New Note
-            </button>
-          </div>
+          {view === 'active' && (
+            <div className="ml-auto">
+              <button
+                onClick={() => { setShowForm(true); setEditingNote(null); }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-xl hover:bg-indigo-600 shadow-md shadow-indigo-200 transition-all duration-200 hover:scale-105 active:scale-95"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                New Note
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
       {/* Main */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters row */}
-        {(categories.length > 0 || notes.length > 0) && (
+
+        {/* Filters row — only shown in active view */}
+        {view === 'active' && (categories.length > 0 || notes.length > 0) && (
           <div className="mb-6 flex flex-wrap items-center gap-4">
             {categories.length > 0 && (
               <CategoryFilter
@@ -172,6 +224,16 @@ export default function Home() {
           </div>
         )}
 
+        {/* Handled view banner */}
+        {view === 'handled' && (
+          <div className="mb-6 flex items-center gap-2 px-4 py-2.5 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            These notes are marked as handled. Uncheck any note to move it back to active.
+          </div>
+        )}
+
         {/* Loading */}
         {loading && (
           <div className="flex justify-center items-center py-24">
@@ -182,18 +244,22 @@ export default function Home() {
         {/* Empty state */}
         {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="text-6xl mb-4">📝</div>
+            <div className="text-6xl mb-4">{view === 'handled' ? '✅' : '📝'}</div>
             <h2 className="text-xl font-semibold text-gray-500 mb-2">
-              {search || activeCategory !== 'All' || jiraFilter !== 'all'
+              {view === 'handled'
+                ? 'No handled notes'
+                : isFiltered
                 ? 'No notes match your filter'
                 : 'No notes yet'}
             </h2>
             <p className="text-gray-400 text-sm mb-6">
-              {search || activeCategory !== 'All' || jiraFilter !== 'all'
+              {view === 'handled'
+                ? 'Mark notes as handled and they\'ll appear here.'
+                : isFiltered
                 ? 'Try adjusting your search or filters.'
                 : 'Create your first sticky note to get started.'}
             </p>
-            {!search && activeCategory === 'All' && jiraFilter === 'all' && (
+            {view === 'active' && !isFiltered && (
               <button
                 onClick={() => setShowForm(true)}
                 className="px-5 py-2.5 bg-indigo-500 text-white text-sm font-medium rounded-xl hover:bg-indigo-600 transition-colors shadow-md shadow-indigo-200"
@@ -216,6 +282,7 @@ export default function Home() {
                   onEdit={openEdit}
                   onDelete={handleDelete}
                   onToggleJira={handleToggleJira}
+                  onToggleHandled={handleToggleHandled}
                 />
                 <NoteSection
                   title="In Jira"
@@ -224,6 +291,7 @@ export default function Home() {
                   onEdit={openEdit}
                   onDelete={handleDelete}
                   onToggleJira={handleToggleJira}
+                  onToggleHandled={handleToggleHandled}
                 />
               </>
             ) : (
@@ -232,6 +300,7 @@ export default function Home() {
                 onEdit={openEdit}
                 onDelete={handleDelete}
                 onToggleJira={handleToggleJira}
+                onToggleHandled={handleToggleHandled}
               />
             )}
           </div>
@@ -241,6 +310,7 @@ export default function Home() {
         {!loading && notes.length > 0 && (
           <p className="mt-8 text-center text-xs text-gray-400">
             {filtered.length} {filtered.length === 1 ? 'note' : 'notes'}
+            {view === 'handled' && ' · Handled'}
             {activeCategory !== 'All' && ` in "${activeCategory}"`}
             {jiraFilter === 'in-jira' && ' · In Jira'}
             {jiraFilter === 'not-in-jira' && ' · Needs Ticket'}
@@ -269,9 +339,10 @@ interface NoteSectionProps {
   onEdit: (note: Note) => void;
   onDelete: (id: string) => void;
   onToggleJira: (note: Note) => void;
+  onToggleHandled: (note: Note) => void;
 }
 
-function NoteSection({ title, indicator, notes, onEdit, onDelete, onToggleJira }: NoteSectionProps) {
+function NoteSection({ title, indicator, notes, onEdit, onDelete, onToggleJira, onToggleHandled }: NoteSectionProps) {
   return (
     <div>
       {title && (
@@ -296,6 +367,7 @@ function NoteSection({ title, indicator, notes, onEdit, onDelete, onToggleJira }
               onEdit={onEdit}
               onDelete={onDelete}
               onToggleJira={onToggleJira}
+              onToggleHandled={onToggleHandled}
             />
           </div>
         ))}

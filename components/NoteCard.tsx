@@ -47,9 +47,10 @@ interface Props {
   onEdit: (note: Note) => void;
   onDelete: (id: string) => void;
   onToggleJira: (note: Note) => void;
+  onToggleHandled: (note: Note) => void;
 }
 
-export default function NoteCard({ note, onEdit, onDelete, onToggleJira }: Props) {
+export default function NoteCard({ note, onEdit, onDelete, onToggleJira, onToggleHandled }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const colors = colorMap[note.color];
 
@@ -62,15 +63,33 @@ export default function NoteCard({ note, onEdit, onDelete, onToggleJira }: Props
   return (
     <div
       className={`
-        group relative flex flex-col rounded-2xl border ${colors.border} ${colors.bg}
+        group relative flex flex-col rounded-2xl border ${colors.border}
+        ${note.isHandled ? 'bg-gray-50 opacity-75' : colors.bg}
         shadow-md hover:shadow-xl transition-all duration-300 ease-in-out
         min-w-[220px] min-h-[160px] w-full
         hover:-translate-y-1
       `}
     >
       {/* Header */}
-      <div className={`${colors.header} rounded-t-2xl px-4 py-3 flex items-start justify-between gap-2`}>
-        <h2 className="font-semibold text-gray-800 text-sm leading-snug break-words flex-1 min-w-0">
+      <div className={`${note.isHandled ? 'bg-gray-200' : colors.header} rounded-t-2xl px-4 py-3 flex items-start justify-between gap-2`}>
+        {/* Handled checkbox */}
+        <button
+          onClick={() => onToggleHandled(note)}
+          title={note.isHandled ? 'Mark as active' : 'Mark as handled'}
+          className={`mt-0.5 shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all duration-200 ${
+            note.isHandled
+              ? 'bg-green-500 border-green-500'
+              : 'border-gray-400 bg-white/60 hover:border-green-400'
+          }`}
+        >
+          {note.isHandled && (
+            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </button>
+
+        <h2 className={`font-semibold text-sm leading-snug break-words flex-1 min-w-0 ${note.isHandled ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
           {note.title || 'Untitled'}
         </h2>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0">
