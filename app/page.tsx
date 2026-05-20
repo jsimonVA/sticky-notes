@@ -63,6 +63,16 @@ export default function Home() {
     setNotes((prev) => prev.filter((n) => n.id !== id));
   };
 
+  const handleToggleJira = async (note: Note) => {
+    const res = await fetch(`/api/notes/${note.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isJiraTicket: !note.isJiraTicket }),
+    });
+    const updated: Note = await res.json();
+    setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+  };
+
   const openEdit = (note: Note) => {
     setEditingNote(note);
     setShowForm(false);
@@ -166,6 +176,7 @@ export default function Home() {
                   note={note}
                   onEdit={openEdit}
                   onDelete={handleDelete}
+                  onToggleJira={handleToggleJira}
                 />
               </div>
             ))}

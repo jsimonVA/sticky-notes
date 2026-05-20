@@ -4,6 +4,7 @@ export interface Note {
   body: string;
   category: string;
   color: NoteColor;
+  isJiraTicket: boolean;
   createdAt: string;
   updatedAt: string;
 }
