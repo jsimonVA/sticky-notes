@@ -5,6 +5,7 @@ import { Note, CreateNotePayload } from '@/types';
 import NoteCard from '@/components/NoteCard';
 import NoteForm from '@/components/NoteForm';
 import CategoryFilter from '@/components/CategoryFilter';
+import FanModeOverlay from '@/components/FanModeOverlay';
 
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -13,6 +14,7 @@ export default function Home() {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [view, setView] = useState<'active' | 'handled'>('active');
   const [fanMode, setFanMode] = useState(false);
+  const [fanAnimation, setFanAnimation] = useState<{ note: Note; rect: DOMRect } | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const [jiraFilter, setJiraFilter] = useState<'all' | 'in-jira' | 'not-in-jira'>('all');
   const [search, setSearch] = useState('');
@@ -87,6 +89,17 @@ export default function Home() {
     });
     const updated: Note = await res.json();
     setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+  };
+
+  const handleFanDelete = (note: Note, rect: DOMRect) => {
+    setFanAnimation({ note, rect });
+  };
+
+  const handleFanComplete = () => {
+    if (fanAnimation) {
+      handleDelete(fanAnimation.note.id);
+      setFanAnimation(null);
+    }
   };
 
   const handleToggleHandled = async (note: Note) => {
@@ -299,6 +312,7 @@ export default function Home() {
                   fanMode={fanMode}
                   onEdit={openEdit}
                   onDelete={handleDelete}
+                  onFanDelete={handleFanDelete}
                   onToggleJira={handleToggleJira}
                   onToggleHandled={handleToggleHandled}
                 />
@@ -309,6 +323,7 @@ export default function Home() {
                   fanMode={fanMode}
                   onEdit={openEdit}
                   onDelete={handleDelete}
+                  onFanDelete={handleFanDelete}
                   onToggleJira={handleToggleJira}
                   onToggleHandled={handleToggleHandled}
                 />
@@ -319,6 +334,7 @@ export default function Home() {
                 fanMode={fanMode}
                 onEdit={openEdit}
                 onDelete={handleDelete}
+                onFanDelete={handleFanDelete}
                 onToggleJira={handleToggleJira}
                 onToggleHandled={handleToggleHandled}
               />
@@ -338,6 +354,15 @@ export default function Home() {
           </p>
         )}
       </main>
+
+      {/* Fan Mode Overlay */}
+      {fanAnimation && (
+        <FanModeOverlay
+          note={fanAnimation.note}
+          rect={fanAnimation.rect}
+          onComplete={handleFanComplete}
+        />
+      )}
 
       {/* Form Modal */}
       {(showForm || editingNote) && (
@@ -359,11 +384,12 @@ interface NoteSectionProps {
   fanMode: boolean;
   onEdit: (note: Note) => void;
   onDelete: (id: string) => void;
+  onFanDelete: (note: Note, rect: DOMRect) => void;
   onToggleJira: (note: Note) => void;
   onToggleHandled: (note: Note) => void;
 }
 
-function NoteSection({ title, indicator, notes, fanMode, onEdit, onDelete, onToggleJira, onToggleHandled }: NoteSectionProps) {
+function NoteSection({ title, indicator, notes, fanMode, onEdit, onDelete, onFanDelete, onToggleJira, onToggleHandled }: NoteSectionProps) {
   return (
     <div>
       {title && (
@@ -388,6 +414,7 @@ function NoteSection({ title, indicator, notes, fanMode, onEdit, onDelete, onTog
               fanMode={fanMode}
               onEdit={onEdit}
               onDelete={onDelete}
+              onFanDelete={onFanDelete}
               onToggleJira={onToggleJira}
               onToggleHandled={onToggleHandled}
             />
