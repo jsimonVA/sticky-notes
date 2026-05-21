@@ -101,30 +101,41 @@ export default function FanModeOverlay({ note, rect, onComplete }: Props) {
 
 function FanGraphic({ blowing }: { blowing: boolean }) {
   return (
-    <div className="relative flex items-center justify-center">
-      {/* Expanding wind rings when blowing */}
+    // Fixed-size container: wind rings and SVG all share this 240×240 box,
+    // so they are guaranteed to stay co-centered.
+    <div className="relative" style={{ width: 240, height: 240, flexShrink: 0 }}>
+      {/* Expanding wind rings — absolute inset-0 keeps them centered in the box */}
       {blowing &&
         [0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className="absolute rounded-full border-[3px] border-indigo-300"
+            className="absolute inset-0 rounded-full border-[3px] border-indigo-300"
             style={{
-              width: 240,
-              height: 240,
               opacity: 0,
               animation: `wind-ring 0.85s ease-out ${i * 0.17}s infinite`,
             }}
           />
         ))}
 
-      {/* Fan SVG */}
+      {/* Fan SVG — fills the 240×240 box exactly */}
       <svg
         width="240"
         height="240"
         viewBox="-120 -120 240 240"
-        style={{ animation: 'fan-appear 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          animation: 'fan-appear 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+        }}
       >
-        {/* Soft glow behind guard */}
+        <defs>
+          <radialGradient id="bladeGrad" cx="50%" cy="80%" r="70%">
+            <stop offset="0%"   stopColor="#818cf8" />
+            <stop offset="100%" stopColor="#4f46e5" />
+          </radialGradient>
+        </defs>
+
+        {/* Soft glow */}
         <circle r="100" fill="rgba(99,102,241,0.07)" />
 
         {/* Guard — outer ring */}
@@ -141,10 +152,12 @@ function FanGraphic({ blowing }: { blowing: boolean }) {
         <line x1="-69" y1="-69" x2="69"  y2="69"  stroke="#475569" strokeWidth="1.2" opacity="0.25" />
         <line x1="69"  y1="-69" x2="-69" y2="69"  stroke="#475569" strokeWidth="1.2" opacity="0.25" />
 
-        {/* Spinning blades */}
+        {/* Spinning blades — transform-box: fill-box makes transform-origin: center
+            relative to the <g>'s own bounding box, not the SVG viewport */}
         <g
           style={{
             transformOrigin: 'center',
+            transformBox: 'fill-box',
             animation: `fan-spin ${blowing ? '0.14s' : '0.55s'} linear infinite`,
           }}
         >
@@ -160,17 +173,9 @@ function FanGraphic({ blowing }: { blowing: boolean }) {
               transform={`rotate(${angle})`}
             />
           ))}
-
-          {/* Gradient definition for blades */}
-          <defs>
-            <radialGradient id="bladeGrad" cx="50%" cy="80%" r="70%">
-              <stop offset="0%"   stopColor="#818cf8" />
-              <stop offset="100%" stopColor="#4f46e5" />
-            </radialGradient>
-          </defs>
         </g>
 
-        {/* Center hub (renders on top of blades) */}
+        {/* Center hub */}
         <circle r="16" fill="#1e1b4b" />
         <circle r="10" fill="#6366f1" />
         <circle r="4"  fill="#c7d2fe" />
