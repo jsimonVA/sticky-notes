@@ -12,6 +12,7 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [view, setView] = useState<'active' | 'handled'>('active');
+  const [fanMode, setFanMode] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
   const [jiraFilter, setJiraFilter] = useState<'all' | 'in-jira' | 'not-in-jira'>('all');
   const [search, setSearch] = useState('');
@@ -151,6 +152,22 @@ export default function Home() {
             </button>
           </div>
 
+          {/* FAN MODE toggle */}
+          <button
+            onClick={() => setFanMode((v) => !v)}
+            title={fanMode ? 'FAN MODE is ON — click to disable' : 'Enable FAN MODE for dramatic deletions'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all duration-300 shrink-0 ${
+              fanMode
+                ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-300 scale-105'
+                : 'bg-gray-100 text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <span style={fanMode ? { display: 'inline-block', animation: 'fan-spin 0.6s linear infinite' } : {}}>
+              <FanButtonIcon active={fanMode} />
+            </span>
+            <span className="hidden sm:inline">{fanMode ? 'FAN ON' : 'FAN'}</span>
+          </button>
+
           {/* Search */}
           <div className="flex-1 max-w-sm relative">
             <svg
@@ -279,6 +296,7 @@ export default function Home() {
                   title="Needs Jira Ticket"
                   indicator="amber"
                   notes={notInJira}
+                  fanMode={fanMode}
                   onEdit={openEdit}
                   onDelete={handleDelete}
                   onToggleJira={handleToggleJira}
@@ -288,6 +306,7 @@ export default function Home() {
                   title="In Jira"
                   indicator="blue"
                   notes={inJira}
+                  fanMode={fanMode}
                   onEdit={openEdit}
                   onDelete={handleDelete}
                   onToggleJira={handleToggleJira}
@@ -297,6 +316,7 @@ export default function Home() {
             ) : (
               <NoteSection
                 notes={filtered}
+                fanMode={fanMode}
                 onEdit={openEdit}
                 onDelete={handleDelete}
                 onToggleJira={handleToggleJira}
@@ -336,13 +356,14 @@ interface NoteSectionProps {
   title?: string;
   indicator?: 'amber' | 'blue';
   notes: Note[];
+  fanMode: boolean;
   onEdit: (note: Note) => void;
   onDelete: (id: string) => void;
   onToggleJira: (note: Note) => void;
   onToggleHandled: (note: Note) => void;
 }
 
-function NoteSection({ title, indicator, notes, onEdit, onDelete, onToggleJira, onToggleHandled }: NoteSectionProps) {
+function NoteSection({ title, indicator, notes, fanMode, onEdit, onDelete, onToggleJira, onToggleHandled }: NoteSectionProps) {
   return (
     <div>
       {title && (
@@ -364,6 +385,7 @@ function NoteSection({ title, indicator, notes, onEdit, onDelete, onToggleJira, 
           <div key={note.id} className="break-inside-avoid">
             <NoteCard
               note={note}
+              fanMode={fanMode}
               onEdit={onEdit}
               onDelete={onDelete}
               onToggleJira={onToggleJira}
@@ -373,5 +395,24 @@ function NoteSection({ title, indicator, notes, onEdit, onDelete, onToggleJira, 
         ))}
       </div>
     </div>
+  );
+}
+
+function FanButtonIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 42 42">
+      {[0, 90, 180, 270].map((angle) => (
+        <ellipse
+          key={angle}
+          cx="21" cy="13"
+          rx="6" ry="10"
+          fill={active ? 'white' : 'currentColor'}
+          opacity={active ? '0.9' : '0.6'}
+          transform={`rotate(${angle} 21 21)`}
+        />
+      ))}
+      <circle cx="21" cy="21" r="5" fill={active ? 'white' : 'currentColor'} />
+      <circle cx="21" cy="21" r="2.5" fill={active ? '#6366f1' : '#e5e7eb'} />
+    </svg>
   );
 }

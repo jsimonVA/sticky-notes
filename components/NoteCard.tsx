@@ -1,64 +1,72 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Note, NoteColor } from '@/types';
 
 const colorMap: Record<NoteColor, { bg: string; header: string; border: string; badge: string }> = {
-  yellow: {
-    bg: 'bg-yellow-50',
-    header: 'bg-yellow-200',
-    border: 'border-yellow-300',
-    badge: 'bg-yellow-300 text-yellow-900',
-  },
-  blue: {
-    bg: 'bg-blue-50',
-    header: 'bg-blue-200',
-    border: 'border-blue-300',
-    badge: 'bg-blue-300 text-blue-900',
-  },
-  green: {
-    bg: 'bg-green-50',
-    header: 'bg-green-200',
-    border: 'border-green-300',
-    badge: 'bg-green-300 text-green-900',
-  },
-  pink: {
-    bg: 'bg-pink-50',
-    header: 'bg-pink-200',
-    border: 'border-pink-300',
-    badge: 'bg-pink-300 text-pink-900',
-  },
-  purple: {
-    bg: 'bg-purple-50',
-    header: 'bg-purple-200',
-    border: 'border-purple-300',
-    badge: 'bg-purple-300 text-purple-900',
-  },
-  orange: {
-    bg: 'bg-orange-50',
-    header: 'bg-orange-200',
-    border: 'border-orange-300',
-    badge: 'bg-orange-300 text-orange-900',
-  },
+  yellow: { bg: 'bg-yellow-50', header: 'bg-yellow-200', border: 'border-yellow-300', badge: 'bg-yellow-300 text-yellow-900' },
+  blue:   { bg: 'bg-blue-50',   header: 'bg-blue-200',   border: 'border-blue-300',   badge: 'bg-blue-300 text-blue-900'   },
+  green:  { bg: 'bg-green-50',  header: 'bg-green-200',  border: 'border-green-300',  badge: 'bg-green-300 text-green-900'  },
+  pink:   { bg: 'bg-pink-50',   header: 'bg-pink-200',   border: 'border-pink-300',   badge: 'bg-pink-300 text-pink-900'   },
+  purple: { bg: 'bg-purple-50', header: 'bg-purple-200', border: 'border-purple-300', badge: 'bg-purple-300 text-purple-900'},
+  orange: { bg: 'bg-orange-50', header: 'bg-orange-200', border: 'border-orange-300', badge: 'bg-orange-300 text-orange-900'},
 };
+
+const WIND_STREAKS = [
+  { top: '18%', width: '55%', delay: '0s',    duration: '0.55s' },
+  { top: '35%', width: '70%', delay: '0.07s', duration: '0.5s'  },
+  { top: '52%', width: '45%', delay: '0.13s', duration: '0.6s'  },
+  { top: '68%', width: '65%', delay: '0.04s', duration: '0.52s' },
+  { top: '82%', width: '38%', delay: '0.1s',  duration: '0.58s' },
+];
+
+function FanIcon({ className }: { className?: string }) {
+  return (
+    <svg width="42" height="42" viewBox="0 0 42 42" className={className}>
+      {[0, 90, 180, 270].map((angle) => (
+        <ellipse
+          key={angle}
+          cx="21" cy="13"
+          rx="6" ry="10"
+          fill="#6366f1"
+          opacity="0.85"
+          transform={`rotate(${angle} 21 21)`}
+        />
+      ))}
+      <circle cx="21" cy="21" r="5" fill="#4f46e5" />
+      <circle cx="21" cy="21" r="2.5" fill="#e0e7ff" />
+    </svg>
+  );
+}
 
 interface Props {
   note: Note;
+  fanMode: boolean;
   onEdit: (note: Note) => void;
   onDelete: (id: string) => void;
   onToggleJira: (note: Note) => void;
   onToggleHandled: (note: Note) => void;
 }
 
-export default function NoteCard({ note, onEdit, onDelete, onToggleJira, onToggleHandled }: Props) {
+export default function NoteCard({ note, fanMode, onEdit, onDelete, onToggleJira, onToggleHandled }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isBlowing, setIsBlowing] = useState(false);
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const colors = colorMap[note.color];
 
   const formattedDate = new Date(note.updatedAt).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+    month: 'short', day: 'numeric', year: 'numeric',
   });
+
+  const handleConfirmDelete = () => {
+    if (fanMode) {
+      setConfirmDelete(false);
+      setIsBlowing(true);
+      deleteTimerRef.current = setTimeout(() => onDelete(note.id), 950);
+    } else {
+      onDelete(note.id);
+    }
+  };
 
   return (
     <div
@@ -66,10 +74,37 @@ export default function NoteCard({ note, onEdit, onDelete, onToggleJira, onToggl
         group relative flex flex-col rounded-2xl border ${colors.border}
         ${note.isHandled ? 'bg-gray-50 opacity-75' : colors.bg}
         shadow-md hover:shadow-xl transition-all duration-300 ease-in-out
-        min-w-[220px] min-h-[160px] w-full
-        hover:-translate-y-1
+        min-w-[220px] min-h-[160px] w-full overflow-hidden
+        ${isBlowing ? '' : 'hover:-translate-y-1'}
+        ${isBlowing ? 'blow-away' : ''}
       `}
     >
+      {/* Fan mode overlay: wind streaks + spinning fan */}
+      {isBlowing && (
+        <div className="absolute inset-0 z-10 pointer-events-none">
+          {/* Wind streaks */}
+          {WIND_STREAKS.map((s, i) => (
+            <div
+              key={i}
+              className="absolute h-0.5 rounded-full bg-gradient-to-r from-transparent via-indigo-300 to-transparent"
+              style={{
+                top: s.top,
+                left: 0,
+                width: s.width,
+                animation: `wind-streak ${s.duration} ease-in-out ${s.delay} forwards`,
+              }}
+            />
+          ))}
+          {/* Spinning fan — bottom-left, as if blowing from outside the card */}
+          <div
+            className="absolute -bottom-1 -left-1"
+            style={{ animation: 'fan-spin 0.22s linear infinite' }}
+          >
+            <FanIcon />
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className={`${note.isHandled ? 'bg-gray-200' : colors.header} rounded-t-2xl px-4 py-3 flex items-start justify-between gap-2`}>
         {/* Handled checkbox */}
@@ -92,6 +127,7 @@ export default function NoteCard({ note, onEdit, onDelete, onToggleJira, onToggl
         <h2 className={`font-semibold text-sm leading-snug break-words flex-1 min-w-0 ${note.isHandled ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
           {note.title || 'Untitled'}
         </h2>
+
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0">
           <button
             onClick={() => onEdit(note)}
@@ -105,10 +141,10 @@ export default function NoteCard({ note, onEdit, onDelete, onToggleJira, onToggl
           {confirmDelete ? (
             <div className="flex gap-1">
               <button
-                onClick={() => onDelete(note.id)}
+                onClick={handleConfirmDelete}
                 className="px-2 py-0.5 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 transition-colors"
               >
-                Yes
+                {fanMode ? '💨 Yes' : 'Yes'}
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
