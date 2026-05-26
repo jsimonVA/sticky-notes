@@ -6,6 +6,7 @@ export interface Note {
   color: NoteColor;
   isJiraTicket: boolean;
   isHandled: boolean;
+  isHighlighted: boolean;
   createdAt: string;
   updatedAt: string;
 }

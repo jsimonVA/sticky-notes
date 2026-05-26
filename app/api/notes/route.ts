@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     color: body.color,
     isJiraTicket: false,
     isHandled: false,
+    isHighlighted: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

@@ -12,6 +12,14 @@ const colorMap: Record<NoteColor, { bg: string; header: string; border: string; 
   orange: { bg: 'bg-orange-50', header: 'bg-orange-200', border: 'border-orange-300', badge: 'bg-orange-300 text-orange-900'},
 };
 
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={filled ? 0 : 2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    </svg>
+  );
+}
+
 interface Props {
   note: Note;
   fanMode: boolean;
@@ -20,9 +28,14 @@ interface Props {
   onFanDelete: (note: Note, rect: DOMRect) => void;
   onToggleJira: (note: Note) => void;
   onToggleHandled: (note: Note) => void;
+  onToggleHighlight: (note: Note) => void;
 }
 
-export default function NoteCard({ note, fanMode, onEdit, onDelete, onFanDelete, onToggleJira, onToggleHandled }: Props) {
+export default function NoteCard({
+  note, fanMode,
+  onEdit, onDelete, onFanDelete,
+  onToggleJira, onToggleHandled, onToggleHighlight,
+}: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const colors = colorMap[note.color];
@@ -45,26 +58,35 @@ export default function NoteCard({ note, fanMode, onEdit, onDelete, onFanDelete,
     <div
       ref={cardRef}
       className={`
-        group relative flex flex-col rounded-2xl border ${colors.border}
+        group relative flex flex-col rounded-2xl
         ${note.isHandled ? 'bg-gray-50 opacity-75' : colors.bg}
         shadow-md hover:shadow-xl transition-all duration-300 ease-in-out
         min-w-[220px] min-h-[160px] w-full overflow-hidden
         hover:-translate-y-1
+        ${note.isHighlighted
+          ? 'border-2 border-amber-400 ring-2 ring-amber-200'
+          : `border ${colors.border}`}
       `}
     >
       {/* Header */}
       <div className={`${note.isHandled ? 'bg-gray-200' : colors.header} rounded-t-2xl px-4 py-3 flex items-start justify-between gap-2`}>
-        {/* Handled checkbox */}
+        {/* Handled checkbox — disabled when highlighted */}
         <button
-          onClick={() => onToggleHandled(note)}
-          title={note.isHandled ? 'Mark as active' : 'Mark as handled'}
+          onClick={note.isHighlighted ? undefined : () => onToggleHandled(note)}
+          title={
+            note.isHighlighted
+              ? 'Remove highlight before marking as handled'
+              : note.isHandled ? 'Mark as active' : 'Mark as handled'
+          }
           className={`mt-0.5 shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all duration-200 ${
-            note.isHandled
-              ? 'bg-green-500 border-green-500'
-              : 'border-gray-400 bg-white/60 hover:border-green-400'
+            note.isHighlighted
+              ? 'border-gray-300 bg-white/40 opacity-30 cursor-not-allowed'
+              : note.isHandled
+              ? 'bg-green-500 border-green-500 cursor-pointer'
+              : 'border-gray-400 bg-white/60 hover:border-green-400 cursor-pointer'
           }`}
         >
-          {note.isHandled && (
+          {note.isHandled && !note.isHighlighted && (
             <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
@@ -75,41 +97,60 @@ export default function NoteCard({ note, fanMode, onEdit, onDelete, onFanDelete,
           {note.title || 'Untitled'}
         </h2>
 
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0">
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Highlight star — always visible when highlighted, hover-only otherwise */}
+          <button
+            onClick={() => onToggleHighlight(note)}
+            title={note.isHighlighted ? 'Remove highlight' : 'Highlight this note'}
+            className={`p-1 rounded-lg transition-all duration-200 ${
+              note.isHighlighted
+                ? 'text-amber-500 hover:text-amber-600'
+                : 'text-gray-400 opacity-0 group-hover:opacity-100 hover:text-amber-500'
+            }`}
+          >
+            <StarIcon filled={note.isHighlighted} />
+          </button>
+
+          {/* Edit — always available */}
           <button
             onClick={() => onEdit(note)}
-            className="p-1 rounded-lg hover:bg-white/50 transition-colors text-gray-600 hover:text-gray-900"
+            className="p-1 rounded-lg hover:bg-white/50 transition-colors text-gray-600 hover:text-gray-900 opacity-0 group-hover:opacity-100"
             title="Edit note"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
           </button>
-          {confirmDelete ? (
-            <div className="flex gap-1">
+
+          {/* Delete — hidden when highlighted */}
+          {!note.isHighlighted && (
+            confirmDelete ? (
+              <div className="flex gap-1">
+                <button
+                  onClick={handleConfirmDelete}
+                  className="px-2 py-0.5 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 transition-colors"
+                >
+                  {fanMode ? '💨 Yes' : 'Yes'}
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-2 py-0.5 rounded-lg bg-gray-200 text-gray-700 text-xs font-medium hover:bg-gray-300 transition-colors"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={handleConfirmDelete}
-                className="px-2 py-0.5 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 transition-colors"
+                onClick={() => setConfirmDelete(true)}
+                className="p-1 rounded-lg hover:bg-white/50 transition-colors text-gray-600 hover:text-red-600 opacity-0 group-hover:opacity-100"
+                title="Delete note"
               >
-                {fanMode ? '💨 Yes' : 'Yes'}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
               </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="px-2 py-0.5 rounded-lg bg-gray-200 text-gray-700 text-xs font-medium hover:bg-gray-300 transition-colors"
-              >
-                No
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="p-1 rounded-lg hover:bg-white/50 transition-colors text-gray-600 hover:text-red-600"
-              title="Delete note"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+            )
           )}
         </div>
       </div>
